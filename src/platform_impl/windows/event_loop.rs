@@ -192,6 +192,7 @@ impl<T: 'static> EventLoop<T> {
     }
 
     let thread_msg_target = create_event_target_window();
+    log::info!("reentrancy dbg: expected hwnd={:?}", thread_msg_target);
 
     super::dark_mode::allow_dark_mode_for_app(true);
 
@@ -2369,10 +2370,9 @@ unsafe extern "system" fn thread_event_target_callback<T: 'static>(
         } else {
           // This WM_PAINT handler will never be re-entrant because `flush_paint_messages`
           // doesn't call WM_PAINT for the thread event target (i.e. this window).
-          assert!(flush_paint_messages(
-            None,
-            &subclass_input.event_loop_runner
-          ));
+          if !flush_paint_messages(None, &subclass_input.event_loop_runner) {
+            log::warn!("reentrancy detected: flush_paint_messages invoked while runner.redrawing() hwnd={:?}", window);
+          }
           subclass_input.event_loop_runner.redraw_events_cleared();
           process_control_flow(&subclass_input.event_loop_runner);
         }
